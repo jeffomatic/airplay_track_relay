@@ -17,15 +17,13 @@ debugLog = (args...) ->
   return unless config.debug
   puts args...
 
-debounce = (targetFunc) ->
-  prevArgs = null
+debounce = (targetFunc, time) ->
   prevTime = 0
+  prevArgs = null
 
   (args...) ->
     now = Date.now()
-
-    return if (now - prevTime) < config.debounceTime || deep.equals(args, prevArgs)
-
+    return if (now - prevTime) < time && deep.equals(args, prevArgs)
     prevTime = now
     prevArgs = args
     targetFunc args...
@@ -33,6 +31,7 @@ debounce = (targetFunc) ->
 messageEmitter = new events.EventEmitter
 announceMessage = debounce (args) ->
   messageEmitter.emit 'message', args
+, config.debounceTime
 
 rtspIncomingSocket.on "message", (msg, rinfo) ->
   currentByte = 0;
