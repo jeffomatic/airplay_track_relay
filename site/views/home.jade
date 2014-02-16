@@ -1,0 +1,29 @@
+extends main-layout
+
+block content
+  div.center
+    h1.center Now Playing at
+    img(src='/ifttt_logo.png').ifttt-logo
+  h1.center#title= song.title
+  h2.center#album= song.album
+  br
+  br
+  h1.center#artist= song.artist
+
+
+
+  script(type='text/javascript').
+    $(function() {
+      var refresh = function() {
+        $.ajax('/now-playing', {
+          type: 'GET',
+          dataType: 'json',
+          success: function(data, status, jqXHR) {
+            $('#title').text(data.title);
+            $('#artist').text(data.artist);
+            $('#album').text(data.album);
+          }
+        });
+      };
+      setInterval(refresh, 1000);
+    });

@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "dependencies": {
+    "deep": "0.0.2",
+    "request": "2.33.0",
+    "underscore": "1.5.1"
+  }
+}
