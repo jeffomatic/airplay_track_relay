@@ -1,4 +1,5 @@
 {
+  "name": "rtsp_track_relay",
   "private": true,
   "dependencies": {
     "deep": "0.0.2",
