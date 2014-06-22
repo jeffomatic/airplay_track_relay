@@ -1,4 +1,5 @@
 #!/usr/bin/env coffee
+_ = require('underscore')
 deep = require('deep')
 dgram = require('dgram')
 events = require('events')
@@ -12,6 +13,8 @@ config =
   debounceTime: 5000
   rtspIncomingPort: 12345
   targetUrl: 'http://localhost:3333/now-playing'
+  playlisttt:
+    accessToken: process.env.PLAYLISTTT_ACCESS_TOKEN
 
 debugLog = (args...) ->
   return unless config.debug
@@ -28,9 +31,22 @@ debounce = (targetFunc, time) ->
     prevArgs = args
     targetFunc args...
 
+messageCount = 0
 messageEmitter = new events.EventEmitter
-announceMessage = debounce (args) ->
-  messageEmitter.emit 'message', args
+announceMessage = debounce (message) ->
+  # Debug ouptut
+  messageCount += 1
+  debugLog "Message count: #{messageCount}"
+
+  # Add message timestamp
+  message = _.extend(
+    {},
+    message,
+    ts: (Date.now() / 1000) | 0
+  )
+
+  # Send to listeners
+  messageEmitter.emit 'message', message
 , config.debounceTime
 
 rtspIncomingSocket.on "message", (msg, rinfo) ->
@@ -87,7 +103,8 @@ rtspIncomingSocket.on "message", (msg, rinfo) ->
     asal: 'album'
     minm: 'title'
 
-  tags = {}
+  rawTags = {}
+  transformedTags = {}
 
   # Parse contents
   if headers['Content-Type'] == 'application/x-dmap-tagged'
@@ -97,29 +114,32 @@ rtspIncomingSocket.on "message", (msg, rinfo) ->
     while currentContentByte < contentLength
       debugLog "<<TAG"
       # Tag
-      tag = new Buffer(4)
-      content.copy tag, 0, currentContentByte, currentContentByte + 4
+      rawTag = new Buffer(4)
+      content.copy rawTag, 0, currentContentByte, currentContentByte + 4
       currentContentByte += 4
-      debugLog "Tag: #{tag}"
+      debugLog "Tag: #{rawTag}"
 
       # Tag data size
       tagDataSize = content.readInt32BE(currentContentByte)
       currentContentByte += 4
       debugLog "Tag data size: #{tagDataSize}"
 
-      if containers.indexOf(tag.toString()) >= 0
+      if containers.indexOf(rawTag.toString()) >= 0
         debugLog "CONTAINER!"
       else
         # Tag data
-        data = new Buffer(tagDataSize)
-        content.copy data, 0, currentContentByte, currentContentByte + tagDataSize
+        rawData = new Buffer(tagDataSize)
+        content.copy rawData, 0, currentContentByte, currentContentByte + tagDataSize
         currentContentByte += tagDataSize
-        debugLog "Tag data: #{data}"
+        debugLog "Tag data: #{rawData}"
 
-        # Collect relevant tags
-        debugLog tag.toString()
-        if transformed = tagTransform[tag.toString()]
-          tags[transformed] = data.toString()
+        # Collect tags
+        debugLog rawTag.toString()
+        rawTags[rawTag.toString()] = rawData.toString()
+
+        # Transform tag titles if necessary
+        if transformed = tagTransform[rawTag.toString()]
+          transformedTags[transformed] = rawData.toString()
 
       debugLog "TAG>>"
 
@@ -130,33 +150,46 @@ rtspIncomingSocket.on "message", (msg, rinfo) ->
   currentByte += 16
   debugLog "METHOD: #{method}"
 
-  if Object.keys(tags).length > 0 && method.toString().indexOf('SET_PARAMETER') >= 0
-    debugLog inspect tags
-    message = tags
-    message.ts = (Date.now() / 1000) | 0
-    announceMessage tags
+  if Object.keys(transformedTags).length > 0 \
+  && method.toString().indexOf('SET_PARAMETER') >= 0 \
+  && rawTags.astm? # Pause events don't include the astm tag
+    debugLog inspect transformedTags
+    announceMessage transformedTags
 
 rtspIncomingSocket.on "listening", ->
   {address, port} = @address()
-  debugLog "Socket started on #{address}:#{port}"
+  debugLog "RTSP socket started on #{address}:#{port}"
 
 rtspIncomingSocket.on "close", ->
   {address, port} = @address()
-  debugLog "Socket closed on #{address}:#{port}"
+  debugLog "RTSP socket closed on #{address}:#{port}"
   exit()
 
 rtspIncomingSocket.on "error", (exception) ->
-  debugLog "Oh noes! We've crashed."
+  debugLog "RTSP socket error"
   debugLog inspect exception
   exit()
 
 rtspIncomingSocket.bind config.rtspIncomingPort
 
+##################
+# Message handlers
+##################
+
+# Debug to console
 messageEmitter.on 'message', (args) -> puts inspect args
+
+# Send to Playlisttt
 messageEmitter.on 'message', (args) ->
   request.post
-    url: config.targetUrl
-    json: args
+    url: 'http://playlisttt.ifttt.com/ifttt/v1/actions/add_song'
+    headers:
+      'Authorization': "Bearer #{config.playlisttt.accessToken}"
+    json:
+      actionFields:
+        artist: args.artist
+        title: args.title
+        album: args.album
     timeout: 5000
   , (err, response) ->
-    puts err.toString() if err?
+    debugLog(err.toString()) if err?
