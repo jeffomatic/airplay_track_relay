@@ -13,7 +13,7 @@ config =
   debounceTime: 5000
   metadataPort: 12345
   playlisttt:
-    baseUrl: 'http://localhost:3000'
+    baseUrl: 'http://localh.ifttt.com:3333'
     #baseUrl: 'http://playlisttt.ifttt.com'
     accessToken: process.env.PLAYLISTTT_ACCESS_TOKEN
 
@@ -118,7 +118,8 @@ raopSocket.on "message", (msg, rinfo) ->
 
   # New song plays should have a title and a non-zero song time
   if transformedTags.title?.length > 0 \
-  && transformedTags.lengthms? > 0
+  && transformedTags.lengthms? \
+  && transformedTags.lengthms > 0
     announceMessage transformedTags
 
 raopSocket.on "listening", ->
@@ -147,7 +148,7 @@ messageEmitter.on 'message', (args) -> puts inspect args
 # Send to Playlisttt
 messageEmitter.on 'message', (args) ->
   request.post
-    url: config.playlisttt.baseUrl + '/ifttt/v1/actions/add_song'
+    url: config.playlisttt.baseUrl + '/ifttt/v1/actions/add_track'
     headers:
       'Authorization': "Bearer #{config.playlisttt.accessToken}"
     json:
