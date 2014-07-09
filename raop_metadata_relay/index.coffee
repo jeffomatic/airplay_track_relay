@@ -13,7 +13,7 @@ config =
   debounceTime: 5000
   metadataPort: 12345
   playlisttt:
-    baseUrl: 'http://localh.ifttt.com:3333'
+    baseUrl: 'http://localh.ifttt.com:3000'
     #baseUrl: 'http://playlisttt.ifttt.com'
     accessToken: process.env.PLAYLISTTT_ACCESS_TOKEN
 
@@ -148,14 +148,13 @@ messageEmitter.on 'message', (args) -> puts inspect args
 # Send to Playlisttt
 messageEmitter.on 'message', (args) ->
   request.post
-    url: config.playlisttt.baseUrl + '/ifttt/v1/actions/add_track'
+    url: config.playlisttt.baseUrl + '/api/playlist'
     headers:
       'Authorization': "Bearer #{config.playlisttt.accessToken}"
     json:
-      actionFields:
-        artist: args.artist
-        title: args.title
-        album: args.album
+      artist: args.artist
+      title: args.title
+      album: args.album
     timeout: 5000
   , (err, response) ->
     debugLog(err.toString()) if err?
