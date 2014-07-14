@@ -9,12 +9,11 @@ request = require('request')
 raopSocket = dgram.createSocket("udp4")
 
 config =
-  debug: true
+  debug: false
   debounceTime: 5000
   metadataPort: 12345
   playlisttt:
-    baseUrl: 'http://localh.ifttt.com:3000'
-    #baseUrl: 'http://playlisttt.ifttt.com'
+    baseUrl: process.env.PLAYLISTTT_BASE_URL ? 'http://localh.ifttt.com:3000'
     accessToken: process.env.PLAYLISTTT_ACCESS_TOKEN
 
 splitBuffer = (buffer, offset) ->
@@ -116,11 +115,14 @@ raopSocket.on "message", (msg, rinfo) ->
 
   debugLog "</dmapcontent>"
 
-  # New song plays should have a title and a non-zero song time
+  # New song plays should have a title and a non-zero song time. Note that song
+  # time events tend to get broadcast repeatedly with different values, so we
+  # should not de-bounce using that value.
   if transformedTags.title?.length > 0 \
   && transformedTags.lengthms? \
   && transformedTags.lengthms > 0
-    announceMessage transformedTags
+    message = _.pick(transformedTags, 'title', 'artist', 'album')
+    announceMessage message
 
 raopSocket.on "listening", ->
   {address, port} = @address()
@@ -148,7 +150,7 @@ messageEmitter.on 'message', (args) -> puts inspect args
 # Send to Playlisttt
 messageEmitter.on 'message', (args) ->
   request.post
-    url: config.playlisttt.baseUrl + '/api/playlist'
+    url: config.playlisttt.baseUrl + '/api/playlist/add_track'
     headers:
       'Authorization': "Bearer #{config.playlisttt.accessToken}"
     json:
